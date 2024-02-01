@@ -44,3 +44,31 @@ use starknet::ContractAddress;
     #[starknet::interface]
     trait IROUTER<TState> {
     }
+
+    #[starknet::interface]
+    trait IFactory<TState> {
+        fn get_pair(self: @TState, token0: ContractAddress, token1: ContractAddress) -> ContractAddress;
+        fn get_all_pairs(self: @TState) -> (felt252, ContractAddress);
+        fn get_num_of_pairs(self: @TState) -> (felt252,);
+        fn get_fee_to(self: @TState) -> ContractAddress;
+        fn get_fee_to_setter(self: @TState) -> ContractAddress;
+        fn get_pair_contract_class_hash(self: @TState) -> felt252;
+        fn create_pair(ref self: TState, tokenA: ContractAddress, tokenB: ContractAddress) -> ContractAddress;
+        fn set_fee_to(ref self: TState, new_fee_to: ContractAddress);
+        fn set_fee_to_setter(ref self: TState, new_fee_to_setter: ContractAddress);
+    }
+
+    #[starknet::interface]
+    trait IJediSwapPair<TState> {
+        fn token0(self: @TState) -> ContractAddress;
+        fn token1(self: @TState) -> ContractAddress;
+        fn get_reserves(self: @TState) -> (u256, u256, felt252);
+        fn price_0_cumulative_last(self: @TState) -> u256;
+        fn price_1_cumulative_last(self: @TState) -> u256;
+        fn klast(self: @TState) -> u256;
+        fn mint(ref self: TState, to: ContractAddress) -> u256;
+        fn burn(ref self: TState, to: ContractAddress) -> (u256, u256);
+        fn swap(ref self: TState, amount0Out: u256, amount1Out: u256, to: ContractAddress, data_len: felt252, data: felt252);
+        fn skim(ref self: TState, to: ContractAddress);
+        fn sync(ref self: TState);
+    }
