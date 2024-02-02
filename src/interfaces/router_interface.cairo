@@ -43,6 +43,8 @@ use starknet::ContractAddress;
 
     #[starknet::interface]
     trait IROUTER<TState> {
+        fn swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(ref self: TState, amount_in: u256, amount_out_min: u256, path: Array<ContractAddress>, to: ContractAddress, deadline: u64);
+
     }
 
     #[starknet::interface]
