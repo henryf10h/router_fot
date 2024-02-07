@@ -3,6 +3,10 @@
 mod Router {
 
     // import pair contracts and factory contracts
+    use core::traits::TryInto;
+use core::traits::IndexView;
+use core::clone::Clone;
+use zeroable::Zeroable;
     use core::array::SpanTrait;
     use core::array::ArrayTrait;
     use router::interfaces::router_interface::IROUTER;
@@ -16,15 +20,23 @@ mod Router {
     use starknet::{ContractAddress, get_contract_address, get_caller_address, get_block_timestamp};
 
     #[storage]
-    struct Storage {}
+    struct Storage {
+        factory: ContractAddress
+    }
+
+    #[constructor]
+    fn constructor(ref self: ContractState, factory: ContractAddress) {
+        self.factory.write(factory);
+    }
 
     #[abi(embed_v0)]
     impl RouterImpl of IROUTER<ContractState> {
     
         fn swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(ref self: ContractState, amount_in: u256, amount_out_min: u256, path: Array<ContractAddress>, to: ContractAddress, deadline: u64) {
             self._ensure(deadline);
-            IERC20Dispatcher{contract_address: *path.at(0)};//.transferFrom
-            let paths = path.span();
+            let paths = @path; //it also compiles with: let paths = path.span()
+            let caller = get_caller_address();
+            IERC20Dispatcher{contract_address: *path.at(0)}.transfer_from(caller,IFactoryDispatcher{contract_address: self.factory.read()}.get_pair(*path.at(0), *path.at(1)),amount_in);
             let balance_before = IERC20Dispatcher { contract_address: *paths[paths.len() - 1] }.balance_of(to);
             self._swap_supporting_fee_on_transfer_tokens(path, to);
 
@@ -38,29 +50,59 @@ mod Router {
     impl InternalImpl of InternalTrait {
         
         fn _swap_supporting_fee_on_transfer_tokens(ref self: ContractState, path: Array<ContractAddress>, to: ContractAddress){
-            // let mut i: u32 = 0;
-            // while i < (path.len() - 1) {
-                // let (input, output) = (path[i], path[i + 1]);
-                // let (token0, token1) = sortTokens(input, output);
-                // let pair = IUniswapV2Pair(UniswapV2Library.pairFor(factory, input, output));
-                // uint amountInput;
-                // uint amountOutput;
-                // { // scope to avoid stack too deep errors
-                // (uint reserve0, uint reserve1,) = pair.getReserves();
-                // (uint reserveInput, uint reserveOutput) = input == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
-                // amountInput = IERC20(input).balanceOf(address(pair)).sub(reserveInput);
-                // amountOutput = UniswapV2Library.getAmountOut(amountInput, reserveInput, reserveOutput);
-                // }
-                // (uint amount0Out, uint amount1Out) = input == token0 ? (uint(0), amountOutput) : (amountOutput, uint(0));
-                // address to = i < path.length - 2 ? UniswapV2Library.pairFor(factory, output, path[i + 2]) : _to;
-                // pair.swap(amount0Out, amount1Out, to, new bytes(0));
-                // i = i + 1;
-            // }
+            let mut i: u32 = 0; 
+            let paths = @path;
+                while i < (paths.len()-1) {  
+                let (token0, token1) = self._sort_tokens(*path.at(i),*path.at(i+1));  
+                // next...
+
+                i = i + 1;  // Ensure to increment i to avoid an infinite loop
+                }
         }
 
         fn _ensure(self: @ContractState, deadline: u64) {
             let block_timestamp = get_block_timestamp();
             assert(deadline >= block_timestamp, 'Transaction too old');
+        }
+
+        fn _sort_tokens(self: @ContractState, token_a: ContractAddress, token_b: ContractAddress) -> (ContractAddress, ContractAddress) {
+            assert(token_a != token_b, 'IDENTICAL_ADDRESSES');
+            if token_a < token_b {
+                let (token_0, token_1) = (token_a, token_b);
+                assert(!token_0.is_zero(), 'ZERO_ADDRESS');
+                return(token_0, token_1);
+            }
+            else{
+                let (token_0, token_1) = (token_b, token_a);
+                assert(!token_0.is_zero(), 'ZERO_ADDRESS');
+                return(token_0, token_1);
+            }
+        }
+
+        fn _pair_for(self: @ContractState, factory: ContractAddress, token_a: ContractAddress, token_b: ContractAddress) -> ContractAddress {
+            let (token_0, token_1) = self._sort_tokens(token_a, token_b);
+            let pair = IFactoryDispatcher{contract_address: factory}.get_pair(token_0, token_1);
+            return(pair);
+        }
+
+        fn _get_reserves(self: @ContractState, factory: ContractAddress, token_a: ContractAddress, token_b: ContractAddress) -> (u256,u256) {
+            let (token_0, token_1) = self._sort_tokens(token_a, token_b);
+            let pair = self._pair_for(factory, token_0, token_1);
+            let (reserve_0, reserve_1, _time_stamp) = IJediSwapPairDispatcher{contract_address: pair}.get_reserves();
+                if (token_a == token_0) {
+                    return(reserve_0, reserve_1);
+                } else {
+                    return(reserve_1, reserve_0);
+                }
+        }
+
+        fn _get_amount_out(self: @ContractState, amount_in: u256, reserve_in: u256, reserve_out: u256) -> u256 {
+            assert(amount_in > 0, 'INSUFFICIENT_INPUT_AMOUNT');
+            assert(reserve_in > 0 && reserve_out > 0, 'INSUFFICIENT_LIQUIDITY');
+            let amount_in_with_fee = amount_in * 997;
+            let numerator = amount_in_with_fee * reserve_out;
+            let denominator = (reserve_in * 1000) + (amount_in_with_fee);
+            return(numerator / denominator);
         }
     }
 }
