@@ -1,12 +1,7 @@
 //**** Specify interface here ****//
 #[starknet::contract]
 mod Router {
-
-    // import pair contracts and factory contracts
-    use core::traits::TryInto;
-use core::traits::IndexView;
-use core::clone::Clone;
-use zeroable::Zeroable;
+    
     use core::array::SpanTrait;
     use core::array::ArrayTrait;
     use router::interfaces::router_interface::IROUTER;
@@ -38,7 +33,7 @@ use zeroable::Zeroable;
             let caller = get_caller_address();
             IERC20Dispatcher{contract_address: *path.at(0)}.transfer_from(caller,IFactoryDispatcher{contract_address: self.factory.read()}.get_pair(*path.at(0), *path.at(1)),amount_in);
             let balance_before = IERC20Dispatcher { contract_address: *paths[paths.len() - 1] }.balance_of(to);
-            self._swap_supporting_fee_on_transfer_tokens(path, to);
+            self._swap_supporting_fee_on_transfer_tokens(0,path, to);
 
             assert(
                 (IERC20Dispatcher { contract_address: *paths[paths.len() - 1] }.balance_of(to) - balance_before) >= amount_out_min, 'INSUFFICIENT_OUTPUT_AMOUNT'
@@ -49,15 +44,45 @@ use zeroable::Zeroable;
     #[generate_trait]
     impl InternalImpl of InternalTrait {
         
-        fn _swap_supporting_fee_on_transfer_tokens(ref self: ContractState, path: Array<ContractAddress>, to: ContractAddress){
-            let mut i: u32 = 0; 
-            let paths = @path;
-                while i < (paths.len()-1) {  
-                let (token0, token1) = self._sort_tokens(*path.at(i),*path.at(i+1));  
-                // next...
+        fn _swap_supporting_fee_on_transfer_tokens(ref self: ContractState, index: u32 , path: Array<ContractAddress>, _to: ContractAddress){
+            let factory = self.factory.read();
+            if (index == path.len() - 1) {
+                return ();
+            }
+            let (token0, _token1) = self._sort_tokens(*path[index], *path[index + 1]);
+            let pair = self._pair_for(factory, *path[index], *path[index + 1]);
+            let mut amount_input: u256 = 0;
+            let mut amount_output: u256 = 0;
+            let (reserve_0, reserve_1) = self._get_reserves(factory, *path[index], *path[index + 1]);
+            let mut reserve_input:u256 = 0;
+            let mut reserve_output:u256 = 0;
+            if (*path[index] == token0) {
+                reserve_input = reserve_0;
+                reserve_output =  reserve_1;
+            } else {
+                reserve_input = reserve_1;
+                reserve_output =  reserve_0;
+            }
+            amount_input = IERC20Dispatcher{contract_address: *path[index]}.balance_of(pair) - reserve_input;
+            amount_output = self._get_amount_out(amount_input, reserve_input, reserve_output);
+            let mut amount_0_out:u256 = 0;
+            let mut amount_1_out:u256 = 0;
+            if (*path[index] == token0) {
+                amount_0_out = 0;
+                amount_1_out =  amount_output;
+            } else {
+                amount_0_out = amount_output;
+                amount_1_out = 0;
+            }
+            let mut to: ContractAddress = _to;
+            if (index < (path.len() - 2)) {
+                to = self._pair_for(factory, *path[index + 1], *path[index + 2]);
+            }
+            let data = ArrayTrait::<felt252>::new();
+            let pairDispatcher = IJediSwapPairDispatcher{ contract_address: pair };
+            pairDispatcher.swap(amount_0_out, amount_1_out, to, data);
 
-                i = i + 1;  // Ensure to increment i to avoid an infinite loop
-                }
+            return InternalImpl::_swap_supporting_fee_on_transfer_tokens(ref self, index + 1, path, _to);
         }
 
         fn _ensure(self: @ContractState, deadline: u64) {

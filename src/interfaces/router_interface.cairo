@@ -70,7 +70,7 @@ use starknet::ContractAddress;
         fn klast(self: @TState) -> u256;
         fn mint(ref self: TState, to: ContractAddress) -> u256;
         fn burn(ref self: TState, to: ContractAddress) -> (u256, u256);
-        fn swap(ref self: TState, amount0Out: u256, amount1Out: u256, to: ContractAddress, data_len: felt252, data: felt252);
+        fn swap(ref self: TState, amount0Out: u256, amount1Out: u256, to: ContractAddress, data: Array::<felt252>);
         fn skim(ref self: TState, to: ContractAddress);
         fn sync(ref self: TState);
     }
