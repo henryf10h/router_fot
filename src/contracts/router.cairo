@@ -1,7 +1,7 @@
 //**** Specify interface here ****//
 #[starknet::contract]
 mod Router {
-    
+
     use core::array::SpanTrait;
     use core::array::ArrayTrait;
     use router::interfaces::router_interface::IROUTER;
@@ -26,6 +26,18 @@ mod Router {
 
     #[abi(embed_v0)]
     impl RouterImpl of IROUTER<ContractState> {
+
+        fn factory(self: @ContractState) -> ContractAddress {
+            self.factory.read()
+        }
+
+        fn get_reserves(self: @ContractState, factory: ContractAddress, token_a: ContractAddress, token_b: ContractAddress) -> (u256,u256){
+            self._get_reserves(self.factory(), token_a, token_b)
+        }
+
+        fn get_amount_out(self: @ContractState, amountIn: u256, reserveIn: u256, reserveOut: u256) -> u256 {
+            self._get_amount_out(amountIn, reserveIn, reserveOut)
+        }
     
         fn swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(ref self: ContractState, amount_in: u256, amount_out_min: u256, path: Array<ContractAddress>, to: ContractAddress, deadline: u64) {
             self._ensure(deadline);
@@ -81,7 +93,6 @@ mod Router {
             let data = ArrayTrait::<felt252>::new();
             let pairDispatcher = IJediSwapPairDispatcher{ contract_address: pair };
             pairDispatcher.swap(amount_0_out, amount_1_out, to, data);
-
             return InternalImpl::_swap_supporting_fee_on_transfer_tokens(ref self, index + 1, path, _to);
         }
 
@@ -131,3 +142,5 @@ mod Router {
         }
     }
 }
+
+
