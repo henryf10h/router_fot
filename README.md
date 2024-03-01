@@ -1,4 +1,5 @@
 # STARKNET WINTER HACKATHON PROJECT
+Starkware hackathon Winner! 🥉 + JediSwap track 🥇
 
 ## FoT router for JEDISWAP V1
 Proudly introducing the FoT Router for JEDISWAP V1, the first router in the StarkNet ecosystem to handle fee-on-transfer (FoT) tokens, unveiled at the StarkNet Winter Hackathon. This innovation sets a new standard for token swaps, enhancing StarkNet's DeFi landscape.
