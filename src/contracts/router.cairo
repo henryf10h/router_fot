@@ -63,29 +63,19 @@ mod Router {
             }
             let (token0, _token1) = self._sort_tokens(*path[index], *path[index + 1]);
             let pair = self._pair_for(factory, *path[index], *path[index + 1]);
-            let mut amount_input: u256 = 0;
-            let mut amount_output: u256 = 0;
             let (reserve_0, reserve_1) = self._get_reserves(factory, *path[index], *path[index + 1]);
-            let mut reserve_input:u256 = 0;
-            let mut reserve_output:u256 = 0;
-            if (*path[index] == token0) {
-                reserve_input = reserve_0;
-                reserve_output =  reserve_1;
+            let (reserve_input, reserve_output) = if (*path[index] == token0) {
+                (reserve_0, reserve_1)
             } else {
-                reserve_input = reserve_1;
-                reserve_output =  reserve_0;
-            }
-            amount_input = IERC20Dispatcher{contract_address: *path[index]}.balance_of(pair) - reserve_input;
-            amount_output = self._get_amount_out(amount_input, reserve_input, reserve_output);
-            let mut amount_0_out:u256 = 0;
-            let mut amount_1_out:u256 = 0;
-            if (*path[index] == token0) {
-                amount_0_out = 0;
-                amount_1_out =  amount_output;
+                (reserve_1, reserve_0)
+            };
+            let amount_input = IERC20Dispatcher{contract_address: *path[index]}.balance_of(pair) - reserve_input;
+            let amount_output = self._get_amount_out(amount_input, reserve_input, reserve_output);
+            let (amount_0_out, amount_1_out) = if (*path[index] == token0) {
+                (0, amount_output)
             } else {
-                amount_0_out = amount_output;
-                amount_1_out = 0;
-            }
+                (amount_output, 0)
+            };
             let mut to: ContractAddress = _to;
             if (index < (path.len() - 2)) {
                 to = self._pair_for(factory, *path[index + 1], *path[index + 2]);
