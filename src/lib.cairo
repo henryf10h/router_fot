@@ -1,5 +1,6 @@
 mod contracts{
     mod router;
+    mod jediSwapV1Router;
 }
 
 mod interfaces{
