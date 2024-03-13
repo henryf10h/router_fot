@@ -4,3 +4,11 @@ version = 1
 [[package]]
 name = "router"
 version = "0.1.0"
+dependencies = [
+ "snforge_std",
+]
+
+[[package]]
+name = "snforge_std"
+version = "0.17.1"
+source = "git+https://github.com/foundry-rs/starknet-foundry.git?tag=v0.17.1#f3237f2325d5fd31fb066cbc18f279839521090c"
