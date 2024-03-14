@@ -298,3 +298,177 @@ fn test_swap_exact_0_to_1(){
     let user_2_token_1_balance_difference = user_2_token_1_balance_final - user_2_token_1_balance_initial;
     assert(user_2_token_1_balance_difference == amount1Out, 'should be eq to amount1Out');
 }
+
+#[test]
+fn test_swap_exact_1_to_0_fee_on_transfer(){
+    // Setup
+    let (factory_address, router_address) = deploy_contracts();
+    let factory_dispatcher = IFactoryC1Dispatcher { contract_address: factory_address };
+    let router_dispatcher = IRouterC1Dispatcher { contract_address: router_address };
+
+    let erc20_amount_per_user: u256 = 100 * TOKEN_MULTIPLIER;
+    let (token0_address, token1_address, _) = deploy_erc20_fee_on_transfer(erc20_amount_per_user);
+    let (sorted_token0_address, sorted_token1_address) = router_dispatcher.sort_tokens(token0_address, token1_address);
+    let pair_address = factory_dispatcher.create_pair(sorted_token0_address, sorted_token1_address);
+    let _pair_dispatcher = IPairC1Dispatcher { contract_address: pair_address };
+
+    let (token0_address, token1_address) = (sorted_token0_address, sorted_token1_address);
+    let token0_erc20_dispatcher = IERC20Dispatcher { contract_address: token0_address };
+    let token1_erc20_dispatcher = IERC20Dispatcher { contract_address: token1_address };
+
+    // Need to use transfer method because calling the _mint internal method on erc20 is not supported yet
+    start_prank(CheatTarget::One(token0_address), user1());
+    token0_erc20_dispatcher.transfer(user2(), erc20_amount_per_user);
+    stop_prank(CheatTarget::One(token0_address));
+
+    let user_1_token_0_balance_initial: u256 = token0_erc20_dispatcher.balance_of(user1());
+    let user_2_token_0_balance_initial: u256 = token0_erc20_dispatcher.balance_of(user2());
+
+    let transfer_fee: u256 = erc20_amount_per_user * 1 / 100; // Calculate the 1% transfer fee
+    let user_1_token_0_lower_bound: u256 = erc20_amount_per_user - transfer_fee;
+    let user_1_token_0_upper_bound: u256 = erc20_amount_per_user + transfer_fee;
+    
+    assert(user_1_token_0_balance_initial >= user_1_token_0_lower_bound, 'u1 token0 balance >= range');
+    assert(user_1_token_0_balance_initial <= user_1_token_0_upper_bound, 'u1 token0 balance <= range');
+
+    let user_2_token_0_lower_bound = erc20_amount_per_user - transfer_fee;
+    let user_2_token_0_upper_bound = erc20_amount_per_user;
+    assert(user_2_token_0_balance_initial >= user_2_token_0_lower_bound, 'u2 token0 balance out of range');
+    assert(user_2_token_0_balance_initial <= user_2_token_0_upper_bound, 'u2 token0 balance out of range');
+
+    start_prank(CheatTarget::One(token1_address), user1());
+    token1_erc20_dispatcher.transfer(user2(), erc20_amount_per_user);
+    stop_prank(CheatTarget::One(token1_address));
+
+    let user_1_token_1_balance_initial: u256 = token1_erc20_dispatcher.balance_of(user1());
+    let user_2_token_1_balance_initial: u256 = token1_erc20_dispatcher.balance_of(user2());
+    assert(user_1_token_1_balance_initial == erc20_amount_per_user, 'user1 token1 eq initial amount');
+    assert(user_2_token_1_balance_initial == erc20_amount_per_user, 'user2 token1 eq initial amount');
+
+    let amount_token0_liq: u256 = 20 * TOKEN_MULTIPLIER;
+    let amount_token1_liq: u256 = 40 * TOKEN_MULTIPLIER;
+
+    start_prank(CheatTarget::One(token0_address), user1());
+    token0_erc20_dispatcher.approve(router_address, amount_token0_liq);
+    stop_prank(CheatTarget::One(token0_address));
+
+    start_prank(CheatTarget::One(token1_address), user1());
+    token1_erc20_dispatcher.approve(router_address, amount_token1_liq);
+    stop_prank(CheatTarget::One(token1_address));
+
+    start_prank(CheatTarget::One(router_address), user1());
+    let (_amountA, _amountB, _liquidity) = router_dispatcher.add_liquidity(
+        token0_address, token1_address, amount_token0_liq, amount_token1_liq, 1, 1, user1(), 0);
+    stop_prank(CheatTarget::One(router_address));
+    // Actual test
+
+    let amount_token_1: u256 = 2 * TOKEN_MULTIPLIER;
+
+    start_prank(CheatTarget::One(token1_address), user2());
+    token1_erc20_dispatcher.approve(router_address, amount_token_1);
+    stop_prank(CheatTarget::One(token1_address));
+
+    let mut path = ArrayTrait::<ContractAddress>::new();
+    path.append(token1_address);
+    path.append(token0_address);
+    
+    start_prank(CheatTarget::One(router_address), user2());
+    let amounts: Array::<u256> = router_dispatcher.swap_exact_tokens_for_tokens(amount_token_1, 0, path, user2(), 0);
+    stop_prank(CheatTarget::One(router_address));
+
+    assert(amounts.len() == 2, 'should be 2');
+
+    let amount1In: u256 = *amounts.at(0);
+    let amount0Out: u256 = *amounts.at(1);
+
+    let user_2_token_0_balance_final: u256 = token0_erc20_dispatcher.balance_of(user2());
+    let user_2_token_0_balance_difference = user_2_token_0_balance_final - user_2_token_0_balance_initial;
+    assert(user_2_token_0_balance_difference >= amount0Out, 'should be eq to amount0Out');
+
+    let user_2_token_1_balance_final: u256 = token1_erc20_dispatcher.balance_of(user2());
+    let user_2_token_1_balance_difference = user_2_token_1_balance_initial - user_2_token_1_balance_final;
+    assert(user_2_token_1_balance_difference == amount1In, 'should be eq to amount1In');
+}
+
+#[test]
+fn test_swap_exact_1_to_0(){
+    // Setup
+    let (factory_address, router_address) = deploy_contracts();
+    let factory_dispatcher = IFactoryC1Dispatcher { contract_address: factory_address };
+    let router_dispatcher = IRouterC1Dispatcher { contract_address: router_address };
+
+    let erc20_amount_per_user: u256 = 100 * TOKEN_MULTIPLIER;
+    let (token0_address, token1_address, _) = deploy_erc20(erc20_amount_per_user);
+    let (sorted_token0_address, sorted_token1_address) = router_dispatcher.sort_tokens(token0_address, token1_address);
+    let pair_address = factory_dispatcher.create_pair(sorted_token0_address, sorted_token1_address);
+    let _pair_dispatcher = IPairC1Dispatcher { contract_address: pair_address };
+
+    let (token0_address, token1_address) = (sorted_token0_address, sorted_token1_address);
+    let token0_erc20_dispatcher = IERC20Dispatcher { contract_address: token0_address };
+    let token1_erc20_dispatcher = IERC20Dispatcher { contract_address: token1_address };
+
+    // Need to use transfer method becuase calling the _mint internal method on erc20 is not supported yet
+    start_prank(CheatTarget::One(token0_address), user1());
+    token0_erc20_dispatcher.transfer(user2(), erc20_amount_per_user);
+    stop_prank(CheatTarget::One(token0_address));
+
+    let user_1_token_0_balance_initial: u256 = token0_erc20_dispatcher.balance_of(user1());
+    let user_2_token_0_balance_initial: u256 = token0_erc20_dispatcher.balance_of(user2());
+    
+    assert(user_1_token_0_balance_initial == erc20_amount_per_user, 'user1 token0 eq initial amount');
+    assert(user_2_token_0_balance_initial == erc20_amount_per_user, 'user2 token0 eq initial amount');
+
+    start_prank(CheatTarget::One(token1_address), user1());
+    token1_erc20_dispatcher.transfer(user2(), erc20_amount_per_user);
+    stop_prank(CheatTarget::One(token1_address));
+
+    let user_1_token_1_balance_initial: u256 = token1_erc20_dispatcher.balance_of(user1());
+    let user_2_token_1_balance_initial: u256 = token1_erc20_dispatcher.balance_of(user2());
+    assert(user_1_token_1_balance_initial == erc20_amount_per_user, 'user1 token1 eq initial amount');
+    assert(user_2_token_1_balance_initial == erc20_amount_per_user, 'user2 token1 eq initial amount');
+
+    let amount_token0_liq: u256 = 20 * TOKEN_MULTIPLIER;
+    let amount_token1_liq: u256 = 40 * TOKEN_MULTIPLIER;
+
+    start_prank(CheatTarget::One(token0_address), user1());
+    token0_erc20_dispatcher.approve(router_address, amount_token0_liq);
+    stop_prank(CheatTarget::One(token0_address));
+
+    start_prank(CheatTarget::One(token1_address), user1());
+    token1_erc20_dispatcher.approve(router_address, amount_token1_liq);
+    stop_prank(CheatTarget::One(token1_address));
+
+    start_prank(CheatTarget::One(router_address), user1());
+    let (_amountA, _amountB, _liquidity) = router_dispatcher.add_liquidity(
+        token0_address, token1_address, amount_token0_liq, amount_token1_liq, 1, 1, user1(), 0);
+    stop_prank(CheatTarget::One(router_address));
+
+    // Actual test
+
+    let amount_token_1: u256 = 2 * TOKEN_MULTIPLIER;
+    
+    start_prank(CheatTarget::One(token1_address), user2());
+    token1_erc20_dispatcher.approve(router_address, amount_token_1);
+    stop_prank(CheatTarget::One(token1_address));
+
+    let mut path = ArrayTrait::<ContractAddress>::new();
+    path.append(token1_address);
+    path.append(token0_address);
+    
+    start_prank(CheatTarget::One(router_address), user2());
+    let amounts: Array::<u256> = router_dispatcher.swap_exact_tokens_for_tokens(amount_token_1, 0, path, user2(), 0);
+    stop_prank(CheatTarget::One(router_address));
+
+    assert(amounts.len() == 2, 'should be 2');
+
+    let amount1In: u256 = *amounts.at(0);
+    let amount0Out: u256 = *amounts.at(1);
+
+    let user_2_token_0_balance_final: u256 = token0_erc20_dispatcher.balance_of(user2());
+    let user_2_token_0_balance_difference = user_2_token_0_balance_final - user_2_token_0_balance_initial;
+    assert(user_2_token_0_balance_difference == amount0Out, 'should be eq to amount0Out');
+
+    let user_2_token_1_balance_final: u256 = token1_erc20_dispatcher.balance_of(user2());
+    let user_2_token_1_balance_difference = user_2_token_1_balance_initial - user_2_token_1_balance_final;
+    assert(user_2_token_1_balance_difference == amount1In, 'should be eq to amount1In');
+}
