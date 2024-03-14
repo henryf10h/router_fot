@@ -78,9 +78,10 @@ fn deploy_erc20(erc20_amount_per_user: u256) -> (ContractAddress, ContractAddres
 
 fn deploy_erc20_fee_on_transfer(erc20_amount_per_user: u256) -> (ContractAddress, ContractAddress, ContractAddress) {
     let erc20_class = declare('ERC20');
-    let reflect_class = declare('REFLECT');
+    let reflect_class = declare('REFLECT'); // fee-on-transfer token standard
     let initial_supply: u256 = erc20_amount_per_user * 2;
 
+    //token0 is the ONLY fee-on-transfer token
     let mut token0_constructor_calldata = Default::default();
     Serde::serialize(@TOKEN0_NAME, ref token0_constructor_calldata);
     Serde::serialize(@SYMBOL, ref token0_constructor_calldata);
@@ -88,6 +89,7 @@ fn deploy_erc20_fee_on_transfer(erc20_amount_per_user: u256) -> (ContractAddress
     Serde::serialize(@user1(), ref token0_constructor_calldata);
     let token0_address = reflect_class.deploy(@token0_constructor_calldata).unwrap();
 
+    //token1 is regular ERC20
     let mut token1_constructor_calldata = Default::default();
     Serde::serialize(@TOKEN1_NAME, ref token1_constructor_calldata);
     Serde::serialize(@SYMBOL, ref token1_constructor_calldata);
@@ -95,14 +97,13 @@ fn deploy_erc20_fee_on_transfer(erc20_amount_per_user: u256) -> (ContractAddress
     Serde::serialize(@user1(), ref token1_constructor_calldata);
     let token1_address = erc20_class.deploy(@token1_constructor_calldata).unwrap();
 
+    //token2 is regular ERC20
     let mut token2_constructor_calldata = Default::default();
     Serde::serialize(@TOKEN1_NAME, ref token2_constructor_calldata);
     Serde::serialize(@SYMBOL, ref token2_constructor_calldata);
     Serde::serialize(@initial_supply, ref token2_constructor_calldata);
     Serde::serialize(@user1(), ref token2_constructor_calldata);
     let token2_address = erc20_class.deploy(@token2_constructor_calldata).unwrap();
-
-    // Deploy token1 and token2 similarly using your token standard contract
 
     (token0_address, token1_address, token2_address)
 }
@@ -143,7 +144,6 @@ fn test_swap_exact_0_to_1_fee_on_transfer(){
     let token0_erc20_dispatcher = IERC20Dispatcher { contract_address: token0_address };
     let token1_erc20_dispatcher = IERC20Dispatcher { contract_address: token1_address };
 
-    // Need to use transfer method because calling the _mint internal method on erc20 is not supported yet
     start_prank(CheatTarget::One(token0_address), user1());
     token0_erc20_dispatcher.transfer(user2(), erc20_amount_per_user);
     stop_prank(CheatTarget::One(token0_address));
@@ -233,7 +233,6 @@ fn test_swap_exact_0_to_1(){
     let token0_erc20_dispatcher = IERC20Dispatcher { contract_address: token0_address };
     let token1_erc20_dispatcher = IERC20Dispatcher { contract_address: token1_address };
 
-    // Need to use transfer method becuase calling the _mint internal method on erc20 is not supported yet
     start_prank(CheatTarget::One(token0_address), user1());
     token0_erc20_dispatcher.transfer(user2(), erc20_amount_per_user);
     stop_prank(CheatTarget::One(token0_address));
@@ -316,7 +315,6 @@ fn test_swap_exact_1_to_0_fee_on_transfer(){
     let token0_erc20_dispatcher = IERC20Dispatcher { contract_address: token0_address };
     let token1_erc20_dispatcher = IERC20Dispatcher { contract_address: token1_address };
 
-    // Need to use transfer method because calling the _mint internal method on erc20 is not supported yet
     start_prank(CheatTarget::One(token0_address), user1());
     token0_erc20_dispatcher.transfer(user2(), erc20_amount_per_user);
     stop_prank(CheatTarget::One(token0_address));
@@ -407,7 +405,6 @@ fn test_swap_exact_1_to_0(){
     let token0_erc20_dispatcher = IERC20Dispatcher { contract_address: token0_address };
     let token1_erc20_dispatcher = IERC20Dispatcher { contract_address: token1_address };
 
-    // Need to use transfer method becuase calling the _mint internal method on erc20 is not supported yet
     start_prank(CheatTarget::One(token0_address), user1());
     token0_erc20_dispatcher.transfer(user2(), erc20_amount_per_user);
     stop_prank(CheatTarget::One(token0_address));
@@ -446,7 +443,7 @@ fn test_swap_exact_1_to_0(){
     // Actual test
 
     let amount_token_1: u256 = 2 * TOKEN_MULTIPLIER;
-    
+
     start_prank(CheatTarget::One(token1_address), user2());
     token1_erc20_dispatcher.approve(router_address, amount_token_1);
     stop_prank(CheatTarget::One(token1_address));
