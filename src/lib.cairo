@@ -1,6 +1,6 @@
 mod contracts{
     mod router;
-    mod jediSwapV1Router;
+    mod jediSwapV1RouterV2;
     mod ownable;
     mod PairC1;
     mod FactoryC1;

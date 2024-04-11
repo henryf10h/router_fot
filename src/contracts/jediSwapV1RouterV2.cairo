@@ -58,7 +58,7 @@ trait IRouterC1<TContractState> {
     fn swap_exact_tokens_for_tokens(ref self: TContractState, amountIn: u256, amountOutMin: u256, path: Array::<ContractAddress>, to: ContractAddress, deadline: u64) -> Array::<u256>;
     fn swap_tokens_for_exact_tokens(ref self: TContractState, amountOut: u256, amountInMax: u256, path: Array::<ContractAddress>, to: ContractAddress, deadline: u64) -> Array::<u256>;
     fn swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(ref self: TContractState, amount_in: u256, amount_out_min: u256, path: Array<ContractAddress>, to: ContractAddress, deadline: u64);
-    // fn replace_implementation_class(ref self: TContractState, new_implementation_class: ClassHash);
+    fn replace_implementation_class(ref self: TContractState, new_implementation_class: ClassHash);
 }
 
 #[starknet::contract]
@@ -69,7 +69,7 @@ mod RouterC1 {
     use zeroable::Zeroable;
     use starknet::{ContractAddress, ClassHash, SyscallResult, SyscallResultTrait, get_caller_address, get_block_timestamp, contract_address_const, contract_address_to_felt252};
     use integer::u256_from_felt252;
-    use starknet::syscalls::{replace_class_syscall, call_contract_syscall};
+    use core::starknet::syscalls::{replace_class_syscall, call_contract_syscall};
 
     use super::{
         IERC20Dispatcher, IERC20DispatcherTrait, IPairDispatcher, IPairDispatcherTrait, IFactoryDispatcher, IFactoryDispatcherTrait
@@ -297,29 +297,40 @@ mod RouterC1 {
             amounts
         }
 
-        fn swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(ref self: ContractState, amount_in: u256, amount_out_min: u256, path: Array<ContractAddress>, to: ContractAddress, deadline: u64) {
+        fn swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(ref self: ContractState, 
+            amount_in: u256,
+            amount_out_min: u256, 
+            path: Array<ContractAddress>, 
+            to: ContractAddress, 
+            deadline: u64
+        ) {
             _ensure_deadline(deadline);
             let paths = @path; //it also compiles with: let paths = path.span()
             let caller = get_caller_address();
-            IERC20Dispatcher{contract_address: *path.at(0)}.transfer_from(caller,IFactoryDispatcher{contract_address: self._factory.read()}.get_pair(*path.at(0), *path.at(1)),amount_in);
+            IERC20Dispatcher{contract_address: *path.at(0)}.transfer_from(
+                caller,
+                IFactoryDispatcher{contract_address: self._factory.read()}.get_pair(*path.at(0), *path.at(1)),
+                amount_in
+            );
             let balance_before = IERC20Dispatcher { contract_address: *paths[paths.len() - 1] }.balance_of(to);
             InternalImpl::_swap_supporting_fee_on_transfer_tokens(ref self, 0, path, to);
 
             assert(
-                (IERC20Dispatcher { contract_address: *paths[paths.len() - 1] }.balance_of(to) - balance_before) >= amount_out_min, 'INSUFFICIENT_OUTPUT_AMOUNT'
+                (IERC20Dispatcher { contract_address: *paths[paths.len() - 1] }.balance_of(to) - balance_before) >= amount_out_min, 
+                'INSUFFICIENT_OUTPUT_AMOUNT'
             );
         }
 
         // @notice This is used upgrade (Will push a upgrade without this to finalize)
         // @dev Only Proxy_admin can call
         // @param new_implementation_class New implementation hash
-        // fn replace_implementation_class(ref self: ContractState, new_implementation_class: ClassHash) {
-        //     let sender = get_caller_address();
-        //     let proxy_admin = self.Proxy_admin.read();
-        //     assert(sender == proxy_admin, 'must be admin');
-        //     assert(!new_implementation_class.is_zero(), 'must be non zero');
-        //     replace_class_syscall(new_implementation_class);
-        // }
+        fn replace_implementation_class(ref self: ContractState, new_implementation_class: ClassHash) {
+            let sender = get_caller_address();
+            let proxy_admin = self.Proxy_admin.read();
+            assert(sender == proxy_admin, 'must be admin');
+            assert(!new_implementation_class.is_zero(), 'must be non zero');
+            replace_class_syscall(new_implementation_class).unwrap();
+        }
     }
 
     #[generate_trait]

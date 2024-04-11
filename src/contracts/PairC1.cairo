@@ -72,7 +72,7 @@ trait IPairC1<TContractState> {
 
 #[starknet::contract]
 mod PairC1 {
-    use router::utils::erc20::ERC20;
+    use jediswap::utils::erc20::ERC20;
     use traits::Into; // TODO remove intos when u256 inferred type is available
     use option::OptionTrait;
     use array::{ArrayTrait, SpanTrait};

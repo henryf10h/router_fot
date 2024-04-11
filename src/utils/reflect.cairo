@@ -6,13 +6,13 @@
 #[starknet::contract]
 mod REFLECT {
     use integer::BoundedInt;
-    use router::interfaces::router_interface::IERC20;
-    use router::interfaces::router_interface::IERC20CamelOnly;
+    use jediswap::interfaces::router_interface::IERC20;
+    use jediswap::interfaces::router_interface::IERC20CamelOnly;
     use starknet::ContractAddress;
     use starknet::get_caller_address;
     use zeroable::Zeroable;
-    use router::interfaces::router_interface::IREFLECT;
-    use router::contracts::ownable::OwnableComponent as ownable_component;
+    use jediswap::interfaces::router_interface::IREFLECT;
+    use jediswap::contracts::ownable::OwnableComponent as ownable_component;
 
     component!(path: ownable_component, storage: ownable, event: OwnableEvent);
 

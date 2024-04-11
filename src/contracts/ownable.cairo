@@ -11,7 +11,7 @@
 /// construction time. This can later be changed with `transfer_ownership`.
 #[starknet::component]
 mod OwnableComponent {
-    use router::interfaces::ownable_interface;
+    use jediswap::interfaces::ownable_interface;
     use starknet::ContractAddress;
     use starknet::get_caller_address;
 

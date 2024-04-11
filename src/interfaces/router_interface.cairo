@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use starknet::ContractAddress;
+use starknet::ClassHash;
 
 #[starknet::interface]
     trait IERC20<TState> {
@@ -42,13 +43,23 @@ use starknet::ContractAddress;
     } 
 
     #[starknet::interface]
-    trait IROUTER<TState> {
-        fn factory(self: @TState) -> ContractAddress;
-        fn get_reserves(self: @TState, factory: ContractAddress, token_a: ContractAddress, token_b: ContractAddress) -> (u256,u256);
-        fn get_amount_out(self: @TState, amountIn: u256, reserveIn: u256, reserveOut: u256) -> u256 ;
-        fn swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(ref self: TState, amount_in: u256, amount_out_min: u256, path: Array<ContractAddress>, to: ContractAddress, deadline: u64);
-
-    }
+    trait IRouterC1<TState> {
+    // view functions
+    fn factory(self: @TState) -> ContractAddress;
+    fn sort_tokens(self: @TState, tokenA: ContractAddress, tokenB: ContractAddress) -> (ContractAddress, ContractAddress);
+    fn quote(self: @TState, amountA: u256, reserveA: u256, reserveB: u256) -> u256;
+    fn get_amount_out(self: @TState, amountIn: u256, reserveIn: u256, reserveOut: u256) -> u256;
+    fn get_amount_in(self: @TState, amountOut: u256, reserveIn: u256, reserveOut: u256) -> u256;
+    fn get_amounts_out(self: @TState, amountIn: u256, path: Array::<ContractAddress>) -> Array::<u256>;
+    fn get_amounts_in(self: @TState, amountOut: u256, path: Array::<ContractAddress>) -> Array::<u256>;
+    // external functions
+    fn add_liquidity(ref self: TState, tokenA: ContractAddress, tokenB: ContractAddress, amountADesired: u256, amountBDesired: u256, amountAMin: u256, amountBMin: u256, to: ContractAddress, deadline: u64) -> (u256, u256, u256);
+    fn remove_liquidity(ref self: TState, tokenA: ContractAddress, tokenB: ContractAddress, liquidity: u256, amountAMin: u256, amountBMin: u256, to: ContractAddress, deadline: u64) -> (u256, u256);
+    fn swap_exact_tokens_for_tokens(ref self: TState, amountIn: u256, amountOutMin: u256, path: Array::<ContractAddress>, to: ContractAddress, deadline: u64) -> Array::<u256>;
+    fn swap_tokens_for_exact_tokens(ref self: TState, amountOut: u256, amountInMax: u256, path: Array::<ContractAddress>, to: ContractAddress, deadline: u64) -> Array::<u256>;
+    fn swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(ref self: TState, amount_in: u256, amount_out_min: u256, path: Array<ContractAddress>, to: ContractAddress, deadline: u64);
+    fn replace_implementation_class(ref self: TState, new_implementation_class: ClassHash);
+}
 
     #[starknet::interface]
     trait IFactory<TState> {
